@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador Profiler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light dark;
+  --papel:#F2F6F3; --folha:#FAFCFA; --tinta:#22302B; --apagado:#52625C;
+  --guia:#1C6B55; --linha:#B5CFC2; --linha-forte:#7FA897; --grafite:#2A2D31; --destaque:#DDEBE3;
+  --E:#D1490C; --C:#7A52D6; --P:#0A8F5F; --A:#2470C8;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --papel:#17201D; --folha:#1E2925; --tinta:#E6EEEA; --apagado:#A6B6AF;
+    --guia:#7CCBB1; --linha:#34463F; --linha-forte:#54706A; --grafite:#E6EEEA; --destaque:#26362F;
+    --E:#D9602B; --C:#8F70E0; --P:#14A070; --A:#3D8BE0;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--papel);color:var(--tinta);
+  font:400 16px/1.45 "Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;font-variant-numeric:tabular-nums}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--guia);outline-offset:2px}
+a{color:var(--guia)}
+
+.topo{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 20px;padding:18px 24px 0;max-width:1440px;margin:auto}
+.topo h1{margin:0;font-size:26px;font-weight:700;line-height:1.2;color:var(--guia)}
+.topo p{margin:0;color:var(--apagado)}
+nav{display:flex;gap:4px;padding:12px 24px 0;max-width:1440px;margin:auto;border-bottom:2px solid var(--guia)}
+nav button{background:none;border:2px solid transparent;border-bottom:0;padding:6px 14px;cursor:pointer;
+  font-weight:600;color:var(--apagado);border-radius:6px 6px 0 0;margin-bottom:-2px}
+nav button[aria-selected=true]{background:var(--papel);border-color:var(--guia);color:var(--guia);border-bottom:2px solid var(--papel)}
+
+main{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:24px;padding:20px 24px 48px;max-width:1440px;margin:auto;align-items:start}
+body[data-aba=teoria] main{grid-template-columns:minmax(0,1fr)}
+body[data-aba=teoria] .painel{display:none}
+[hidden]{display:none!important}
+
+/* Cartão-resposta */
+.acoes{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:14px}
+.acoes label{display:flex;gap:8px;align-items:center;cursor:pointer}
+.acoes input{accent-color:var(--guia);width:18px;height:18px}
+.botao{background:none;border:1px solid var(--linha-forte);border-radius:4px;padding:5px 12px;cursor:pointer}
+.botao:hover{background:var(--destaque)}
+.blocos{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+.bloco{background:var(--folha);border:1px solid var(--guia);border-radius:2px}
+.cab,.linha{display:grid;grid-template-columns:28px minmax(0,1fr) 44px 52px;align-items:center}
+.cab{background:var(--guia);color:var(--papel);font-size:14px;font-weight:600;padding:3px 0}
+.cab span{text-align:center}
+.cab span:nth-child(2){text-align:left}
+.linha{min-height:34px;border-top:1px solid var(--linha)}
+.linha:nth-child(5n+2){border-top-color:var(--linha-forte)}
+.linha:hover,.linha:focus-within{background:var(--destaque)}
+.num{font-size:13px;color:var(--apagado);text-align:center}
+.pal{display:flex;gap:6px;align-items:center;min-width:0;padding-right:4px;line-height:1.15}
+.pal b{font-weight:500;overflow-wrap:anywhere}
+.tag{flex:none;display:inline-flex;gap:3px;align-items:center;font-size:13px;font-weight:600;color:var(--apagado)}
+.tag i{width:8px;height:8px;border-radius:50%;background:var(--cor)}
+.cega .tag{display:none}
+.oval{display:flex;justify-content:center;align-items:center;height:34px;cursor:pointer}
+.oval input{position:absolute;opacity:0;width:1px;height:1px}
+.oval span{display:block;width:26px;height:15px;border:1.5px solid var(--guia);border-radius:50%;transition:background-color .12s}
+.oval:hover span{background:var(--linha)}
+.oval input:checked+span{background:var(--grafite);border-color:var(--grafite)}
+.oval input:focus-visible+span{outline:2px solid var(--guia);outline-offset:2px}
+
+/* Painel */
+.alvos{background:var(--folha);border:1px solid var(--guia);border-radius:2px;padding:12px 14px;margin-bottom:16px}
+.alvos h2{margin:0 0 8px;font-size:19px;font-weight:700;line-height:1.2;color:var(--guia)}
+.campos{display:grid;grid-template-columns:repeat(4,minmax(0,150px));gap:10px}
+.campos label{display:block;font-size:15px;font-weight:600}
+.campos label span{display:flex;align-items:center;gap:5px;margin-bottom:2px}
+.campos i{flex:none;width:9px;height:9px;border-radius:50%;background:var(--cor)}
+.campos input{width:100%;background:var(--papel);border:1px solid var(--linha-forte);border-radius:3px;padding:4px 6px;font-weight:600}
+.soma{margin:8px 0 10px;color:var(--apagado)}
+.soma.erro{color:var(--tinta);font-weight:600}
+.comandos{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.comandos label{display:flex;gap:6px;align-items:center}
+.comandos select{background:var(--folha);border:1px solid var(--linha-forte);border-radius:3px;padding:4px}
+.botao.forte{background:var(--guia);border-color:var(--guia);color:var(--papel);font-weight:600}
+.botao.forte:hover{background:var(--guia);opacity:.88}
+.botao:disabled{opacity:.45;cursor:not-allowed}
+.relato{margin:10px 0 0;padding-top:8px;border-top:1px solid var(--linha);max-width:90ch}
+.relato:empty{display:none}
+.painel{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto;background:var(--folha);border:1px solid var(--guia);border-radius:2px;padding:14px 16px}
+.modos{display:grid;grid-template-columns:1fr 1fr 1fr;border:1px solid var(--guia);border-radius:4px;overflow:hidden}
+.modos button{background:none;border:0;padding:5px 2px;cursor:pointer;font-weight:600;color:var(--guia)}
+.modos button+button{border-left:1px solid var(--guia)}
+.modos button[aria-pressed=true]{background:var(--guia);color:var(--papel)}
+.codigo{display:flex;align-items:flex-end;gap:14px;margin:12px 0 8px}
+.codigo strong{font-size:68px;line-height:.9;font-weight:700;letter-spacing:.01em;min-width:1.2em}
+.codigo div{color:var(--apagado);line-height:1.25;padding-bottom:2px}
+.codigo div b{color:var(--tinta);font-weight:600}
+.fator{display:grid;grid-template-columns:1fr auto;gap:0 8px;margin-top:10px}
+.fator .nome{display:flex;align-items:center;gap:6px;font-weight:600}
+.fator .nome i{width:10px;height:10px;border-radius:50%;background:var(--cor)}
+.fator .valor{font-weight:700;text-align:right}
+.trilho{grid-column:1/-1;position:relative;height:20px;margin:2px 0}
+.trilho .base{position:absolute;left:0;right:0;top:3px;height:9px;background:var(--destaque)}
+.trilho .barra{position:absolute;left:0;top:3px;height:9px;background:var(--cor);border-radius:0 4px 4px 0;transition:width .15s}
+.trilho .faixa{position:absolute;top:16px;height:2px;background:var(--tinta)}
+.trilho .faixa::before,.trilho .faixa::after{content:"";position:absolute;top:-2px;width:1.5px;height:6px;background:var(--tinta)}
+.trilho .faixa::before{left:0}.trilho .faixa::after{right:0}
+.trilho .alvo{position:absolute;top:0;width:3px;height:15px;background:var(--tinta);outline:1.5px solid var(--folha)}
+.fator .dif{grid-column:1/-1;font-size:14px;color:var(--apagado)}
+.legenda{margin:12px 0 0;padding:8px 0 0;border-top:1px solid var(--linha);font-size:14px;color:var(--apagado);line-height:1.3}
+.legenda span{display:inline-block;vertical-align:middle;margin-right:4px}
+.leg-alvo{width:3px;height:13px;background:var(--tinta)}
+.leg-faixa{width:18px;height:2px;background:var(--tinta)}
+.efeito{margin-top:10px;padding:8px;background:var(--destaque);min-height:64px;font-size:15px;line-height:1.25}
+.efeito p{margin:0 0 4px}
+.efeito div{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-weight:600}
+.aviso{margin:10px 0 0;font-size:14px;line-height:1.3;color:var(--apagado)}
+
+/* Chave */
+.intro{max-width:72ch;margin:0 0 16px}
+.grupo{margin-bottom:24px}
+.grupo h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:21px;font-weight:700;line-height:1.2}
+.grupo h2 i{width:12px;height:12px;border-radius:50%;background:var(--cor)}
+.grupo h2 small{font-size:15px;font-weight:400;color:var(--apagado)}
+.rola{overflow-x:auto}
+table{width:100%;border-collapse:collapse;background:var(--folha);min-width:480px}
+th,td{text-align:left;padding:4px 10px;border-top:1px solid var(--linha);vertical-align:middle}
+th{font-weight:600;background:var(--destaque);border-top:0}
+td select{background:var(--folha);border:1px solid var(--linha-forte);border-radius:3px;padding:2px 4px}
+.mudou{font-weight:700}
+
+/* Teoria */
+.teoria{max-width:72ch}
+.teoria h2{font-size:23px;font-weight:700;line-height:1.2;margin:28px 0 8px;color:var(--guia)}
+.teoria h2:first-child{margin-top:0}
+.teoria p,.teoria li{margin:0 0 10px;font-size:17px}
+.teoria ul{padding-left:20px;margin:0 0 10px}
+.conta{background:var(--folha);border-left:4px solid var(--guia);padding:10px 14px;margin:0 0 12px;font-size:17px}
+.teoria table{min-width:0;margin-bottom:12px}
+
+@media (max-width:900px){
+  .topo{padding:12px 16px 0}
+  .topo h1{font-size:22px}
+  nav{padding:8px 16px 0}
+  nav button{padding:5px 10px}
+  main,body[data-aba=teoria] main{grid-template-columns:minmax(0,1fr);padding:0 0 40px;gap:14px}
+  .painel{order:-1;top:0;z-index:5;border-width:0 0 2px;padding:8px 16px;max-height:none;overflow:visible}
+  .campos{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  .campos label{font-size:12px}
+  .campos label span{gap:3px}
+  .campos i{width:7px;height:7px}
+  .campos input{padding:4px}
+  .area{padding:0 16px}
+  .codigo{margin:6px 0 2px;gap:10px}
+  .codigo strong{font-size:34px}
+  .codigo div{font-size:14px}
+  .fator{grid-template-columns:96px minmax(0,1fr) 58px;align-items:center;margin-top:1px}
+  .fator .nome{font-size:14px;gap:4px}
+  .trilho{grid-column:2;grid-row:1;height:19px}
+  .fator .valor{grid-column:3;font-size:15px}
+  .fator .dif,.legenda,.aviso{display:none}
+  .efeito{min-height:0;margin-top:5px;padding:4px 8px;font-size:14px}
+  .efeito p{margin:0}
+  .blocos{grid-template-columns:minmax(0,1fr)}
+  .teoria p,.teoria li,.conta{font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body data-aba="cartao">
+<header class="topo">
+  <h1>Simulador Profiler</h1>
+  <p>Projeto independente, sem vínculo com a Sólides. Não é o teste oficial e não gera resultado válido: os pesos são estimados, porque a chave oficial não é pública.</p>
+</header>
+<nav role="tablist" aria-label="Seções">
+  <button role="tab" data-aba="cartao" aria-selected="true">Cartão</button>
+  <button role="tab" data-aba="chave" aria-selected="false">Chave de pesos</button>
+  <button role="tab" data-aba="teoria" aria-selected="false">Como funciona</button>
+</nav>
+
+<main>
+  <div class="area">
+    <section id="cartao">
+      <div class="alvos">
+        <h2>Percentual que você quer atingir</h2>
+        <div class="campos" id="campos"></div>
+        <p class="soma" id="soma"></p>
+        <div class="comandos">
+          <label>Folga por perfil
+            <select id="folga">
+              <option value="0.005">Exato</option>
+              <option value="0.5">Até 0,5 ponto</option>
+              <option value="1">Até 1 ponto</option>
+              <option value="2">Até 2 pontos</option>
+            </select>
+          </label>
+          <button class="botao forte" id="encherSou">Preencher Sou</button>
+          <button class="botao forte" id="encherDevo">Preencher Devo ser</button>
+          <button class="botao" id="desfazer" hidden>Desfazer preenchimento</button>
+          <button class="botao" id="voltarCargo">Voltar aos valores do cargo</button>
+        </div>
+        <p class="relato" id="relato" role="status"></p>
+      </div>
+      <div class="acoes">
+        <label><input type="checkbox" id="cega"> Esconder o perfil de cada palavra</label>
+        <button class="botao" id="limpar">Limpar cartão</button>
+      </div>
+      <div class="blocos" id="blocos"></div>
+    </section>
+
+    <section id="chave" hidden>
+      <p class="intro">Cada palavra conta 1 ponto para um perfil. Se suspeitar de uma classificação, troque o perfil aqui: o painel recalcula na hora e a troca fica salva neste navegador.</p>
+      <div class="acoes"><button class="botao" id="restaurar">Restaurar a chave original</button></div>
+      <div id="tabelas"></div>
+    </section>
+
+    <section id="teoria" class="teoria" hidden>
+      <h2>O que é fato e o que é hipótese</h2>
+      <ul>
+        <li><strong>Fato:</strong> são 87 adjetivos, na mesma ordem nas duas partes. A parte 1 pergunta o que você é. A parte 2 pergunta como os outros acham que você deve ser.</li>
+        <li><strong>Fato:</strong> a Sólides descreve a parte 1 como autopercepção e a parte 2 como exigência do meio, e não publica a pontuação por palavra.</li>
+        <li><strong>Dedução:</strong> os percentuais do cargo são exatamente 16, 15, 8 e 13 em 52.</li>
+        <li><strong>Hipótese:</strong> cada palavra vale 1 ponto para um único perfil. Daí sai a fórmula usada aqui.</li>
+        <li><strong>Hipótese:</strong> a classificação das 87 palavras é minha, a partir da teoria DISC e dos textos da Sólides. Só 11 palavras aparecem nesses textos ligadas a um perfil.</li>
+      </ul>
+
+      <h2>A pista dos 52 pontos</h2>
+      <table>
+        <thead><tr><th>Perfil</th><th>Cargo</th><th>Em 52</th></tr></thead>
+        <tbody>
+          <tr><td>Executor</td><td>30,77 %</td><td>16</td></tr>
+          <tr><td>Comunicador</td><td>28,85 %</td><td>15</td></tr>
+          <tr><td>Planejador</td><td>15,38 %</td><td>8</td></tr>
+          <tr><td>Analista</td><td>25,00 %</td><td>13</td></tr>
+        </tbody>
+      </table>
+      <p>Testei todos os denominadores de 1 a 400. Só 52 e seus múltiplos reproduzem os quatro números com duas casas. Isso sugere contagem de unidades inteiras, mas não prova que a unidade seja uma palavra, nem que todas valham o mesmo.</p>
+
+      <h2>Como uma palavra muda os percentuais</h2>
+      <div class="conta">percentual do perfil = palavras marcadas desse perfil ÷ total de palavras marcadas</div>
+      <p>Nesse modelo, o resultado é uma proporção, e isso traz três consequências:</p>
+      <ul>
+        <li><strong>Marcar sobe um e desce três.</strong> Uma palavra de Executor aumenta o Executor e reduz os outros perfis, porque o total cresce.</li>
+        <li><strong>As primeiras marcas pesam mais.</strong> Com 3 de 10 palavras, mais uma de Executor leva de 30,00 % para 36,36 % (+6,36). Com 16 de 52, leva de 30,77 % para 32,08 % (+1,31).</li>
+        <li><strong>Só a proporção importa.</strong> 4, 3, 2 e 3 palavras dão o mesmo resultado que 8, 6, 4 e 6.</li>
+      </ul>
+      <p>O modelo não dá peso diferente para adjetivos negativos. "Arrogante" e "Líder" valem o mesmo para o Executor, mas a Sólides pode tratar isso de outro jeito: o relatório tem um índice de positividade.</p>
+
+      <h2>Por que o cargo é EC, e não ECA</h2>
+      <p>Com quatro perfis, a média é 25 %. Executor e Comunicador ficam acima dela, e Analista fica exatamente nela. A regra usada aqui é: entra no código o perfil que passa de 25 %, do maior para o menor. Ela explica este cargo, mas é só um caso. Vale conferir com outros cargos.</p>
+
+      <h2>O que este simulador não calcula</h2>
+      <ul>
+        <li><strong>Qual parte alimenta o match.</strong> A Sólides diz que o algoritmo avalia o comportamento natural e a adaptação, mas não diz como combina os dois. Por isso o painel mostra Sou, Devo ser e a soma.</li>
+        <li><strong>O percentual de match com a vaga.</strong> O método do Matcher não é publicado.</li>
+        <li><strong>Os outros índices do relatório.</strong> Energia, exigência do meio, aproveitamento, moral, positividade, amplitude, tempo de resposta, flexibilidade e incitabilidade ficam de fora.</li>
+      </ul>
+
+      <h2>Como o preenchimento automático escolhe</h2>
+      <p>Ele procura, de 87 palavras para baixo, o maior total cuja proporção respeita a folga em todos os perfis. Sem combinação dentro da folga, usa a mais próxima do alvo e avisa. Como o total precisa ser inteiro e cada perfil tem um limite de palavras, nem todo alvo é exato.</p>
+      <p>Dentro de cada perfil, entram primeiro as palavras de confiança mais alta. Em caso de empate, os adjetivos que considerei positivos vêm antes dos negativos. Essa prioridade é uma escolha minha e não muda o percentual calculado.</p>
+
+      <h2>Como testar a chave</h2>
+      <p>Compare o simulador com um relatório real, preenchido por você com as mesmas marcas. Se um perfil divergir, a causa pode estar na chave ou na própria hipótese de 1 ponto por palavra. Comece pelas palavras de confiança baixa, trocando-as na aba Chave de pesos.</p>
+
+      <h2>Fontes</h2>
+      <ul>
+        <li><a href="https://solides.com.br/blog/tudo-sobre-profiler/">Sólides: tudo sobre o Profiler</a> (partes do teste, índices, descrição dos perfis)</li>
+        <li><a href="https://solides.com.br/blog/disc-x-profiler/">Sólides: DISC x Profiler</a> (base no DISC, descrição dos perfis)</li>
+        <li><a href="https://wp-meuespaco-bucket.s3.amazonaws.com/wp-content/uploads/2025/04/10115002/Profiler-Conscientizacao-_-Lideranca.pdf">Material institucional do Profiler</a> (acesso às palavras marcadas e aos índices)</li>
+      </ul>
+    </section>
+  </div>
+
+  <aside class="painel" aria-label="Resultado">
+    <div class="modos" role="group" aria-label="Parte calculada">
+      <button data-modo="sou" aria-pressed="true">Sou</button>
+      <button data-modo="devo" aria-pressed="false">Devo ser</button>
+      <button data-modo="soma" aria-pressed="false">Soma</button>
+    </div>
+    <div class="codigo" aria-live="polite">
+      <strong id="codigo">–</strong>
+      <div><b id="total">0 palavras</b><br><span id="codigoAlvo">Alvo: EC</span></div>
+    </div>
+    <div id="fatores"></div>
+    <p class="legenda"><span class="leg-alvo"></span>percentual que você quer atingir<br><span class="leg-faixa"></span>faixa possível se as palavras incertas forem do perfil alternativo</p>
+    <div class="efeito" id="efeito"></div>
+    <p class="aviso">Estimativa para estudo. O resultado oficial pode ser diferente.</p>
+  </aside>
+</main>
+
+<script>
+const FATORES = {
+  E: {nome: 'Executor'},
+  C: {nome: 'Comunicador'},
+  P: {nome: 'Planejador'},
+  A: {nome: 'Analista'},
+};
+const LETRAS = Object.keys(FATORES);
+const CARGO = {E: 30.77, C: 28.85, P: 15.38, A: 25};
+const NEGATIVAS = new Set(['Indeciso','Inseguro','Ingênuo','Medroso','Intolerante','Pretensioso','Barulhento','Desconfiado',
+  'Desmotivado','Insensível','Anti-social','Inflexível','Vingativo','Orgulhoso','Exagerado','Pessimista','Espalhafatoso',
+  'Vaidoso','Impaciente','Arrogante','Egocêntrico','Desorganizado','Frio','Depressivo','Indisciplinado','Egoísta',
+  'Temeroso','Procrastinador','Sarcástico']);
+const CONFIANCA = {a: 'Alta', m: 'Média', b: 'Baixa'};
+
+// [palavra, perfil, confiança, perfil alternativo, citada pela Sólides]. Ordem do formulário.
+const PALAVRAS = [
+  ['Contagiante','C','a'],['Audacioso (ousado)','E','a'],['Indeciso','P','m','A'],['Equilibrado','P','m','A'],
+  ['Inseguro','A','b','P'],['Líder','E','a'],['Ingênuo','P','b','C'],['Leal','P','a'],['Dedicado','P','m','A'],
+  ['Otimista','C','a'],['Eficiente','E','b','A'],['Habilidoso','C','b','E'],['Corajoso','E','a'],['Comunicativo','C','a'],
+  ['Decidido','E','a'],['Medroso','A','b','P'],['Ativo','E','m','C',1],['Intolerante','E','a'],['Pretensioso','E','b','C'],
+  ['Persistente','E','m','P'],['Barulhento','C','a'],['Animado','C','a'],['Prático','E','m','P'],['Minucioso','A','a'],
+  ['Discreto','A','m','P',1],['Desconfiado','A','a'],['Auto-Disciplinado','A','m','P'],['Entusiasta','C','a'],
+  ['Resoluto (decidido)','E','a'],['Sensível','P','m','C'],['Crítico','A','m','E'],['Exigente','A','m','E',1],
+  ['Influenciador','C','a'],['Empolgante','C','a'],['Desmotivado','P','b','A'],['Insensível','E','m','A'],
+  ['Anti-social','A','m','E'],['Estimulante','C','a'],['Inflexível','E','m','A',1],['Vingativo','E','b','A'],
+  ['Extrovertido','C','a',null,1],['Orgulhoso','E','b','C'],['Teórico','A','a'],['Exagerado','C','a'],['Firme','E','a'],
+  ['Modesto','P','a'],['Alegre','C','a'],['Racional','A','a'],['Rotineiro','P','m','A'],['Calculista','A','a'],
+  ['Bem-Quisto','C','m','P'],['Destacado','C','b','E'],['Pessimista','A','a'],['Metódico','A','a'],
+  ['Calmo','P','a',null,1],['Tranquilo','P','a',null,1],['Espalhafatoso','C','a'],['Vaidoso','C','a',null,1],
+  ['Bem-humorado','C','a'],['Simpático','C','a'],['Impaciente','E','a'],['Bom Companheiro','P','a'],['Arrogante','E','a'],
+  ['Egocêntrico','E','m','C'],['Conservador','P','m','A'],['Desorganizado','C','a'],['Frio','A','b','E'],
+  ['Cumpridor','P','m','A'],['Popular','C','a'],['Paciente','P','a',null,1],['Sentimental','P','m','C'],
+  ['Depressivo','A','b','P'],['Reservado','A','m','P'],['Enérgico','E','a'],['Perfeccionista','A','a',null,1],
+  ['Sincero','P','b','E'],['Idealista','C','b','A'],['Indisciplinado','C','m','E'],['Auto-Suficiente','E','a'],
+  ['Exuberante','C','a'],['Introvertido','P','m','A',1],['Independente','E','a'],['Egoísta','E','m','A'],
+  ['Temeroso','A','b','P'],['Procrastinador','P','b','C'],['Sarcástico','E','b','A'],['Compreensivo','P','a'],
+].map(([nome, fator, conf, alt, citada], i) => ({i, nome, fator, conf, alt: alt || null, citada: !!citada}));
+
+function ler(chave, padrao) {
+  try { return JSON.parse(localStorage.getItem(chave)) ?? padrao; } catch { return padrao; }
+}
+function gravar(chave, valor) {
+  try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* o simulador funciona sem salvar */ }
+}
+
+const estado = {
+  sou: new Set(ler('profiler.sou', [])),
+  devo: new Set(ler('profiler.devo', [])),
+  trocas: ler('profiler.trocas', {}),
+  alvos: {...CARGO, ...ler('profiler.alvos', {})},
+  desfazer: null,
+  modo: 'sou',
+};
+
+const fatorDe = p => estado.trocas[p.i] || p.fator;
+const altDe = p => (estado.trocas[p.i] ? null : p.alt);
+const fmt = n => n.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const sinal = n => (n >= 0.005 ? '+' : n <= -0.005 ? '−' : '') + fmt(Math.abs(n));
+const pontos = n => `${fmt(n)} ${n >= 2 ? 'pontos' : 'ponto'}`;
+
+// Lista de marcas do modo: na Soma, uma palavra marcada nas duas partes conta duas vezes.
+function marcas(modo, sou = estado.sou, devo = estado.devo) {
+  if (modo === 'sou') return [...sou];
+  if (modo === 'devo') return [...devo];
+  return [...sou, ...devo];
+}
+
+function calcular(lista) {
+  const n = {E: 0, C: 0, P: 0, A: 0}, min = {E: 0, C: 0, P: 0, A: 0}, max = {E: 0, C: 0, P: 0, A: 0};
+  let total = 0;
+  for (const i of lista) {
+    const p = PALAVRAS[i], f = fatorDe(p), alt = altDe(p);
+    if (f === 'N') continue;
+    total++; n[f]++; max[f]++;
+    if (alt) max[alt]++; else min[f]++;
+  }
+  const pct = o => Object.fromEntries(LETRAS.map(l => [l, total ? o[l] / total * 100 : 0]));
+  return {n, total, pct: pct(n), min: pct(min), max: pct(max)};
+}
+
+function codigoDe(r) {
+  if (!r.total) return '–';
+  return LETRAS.filter(l => r.pct[l] > 25).sort((a, b) => r.pct[b] - r.pct[a]).join('') || '–';
+}
+
+const somaAlvos = () => LETRAS.reduce((s, l) => s + estado.alvos[l], 0);
+const alvosValidos = () => Math.abs(somaAlvos() - 100) <= 0.05;
+
+// Palavras de cada perfil, da que mais confiamos para a que menos confiamos.
+function palavrasPorPerfil() {
+  const rank = p => (estado.trocas[p.i] ? 0 : {a: 0, m: 1, b: 2}[p.conf]);
+  const neg = p => (NEGATIVAS.has(p.nome) ? 1 : 0);
+  return Object.fromEntries(LETRAS.map(l => [l, PALAVRAS.filter(p => fatorDe(p) === l)
+    .sort((a, b) => rank(a) - rank(b) || neg(a) - neg(b) || a.i - b.i)]));
+}
+
+// Reparte N palavras pelos perfis sem passar do que cada um tem disponível.
+function distribuir(N, disp) {
+  const ideal = l => estado.alvos[l] * N / 100;
+  const n = Object.fromEntries(LETRAS.map(l => [l, Math.min(disp[l], Math.floor(ideal(l) + 1e-9))]));
+  let falta = N - LETRAS.reduce((s, l) => s + n[l], 0);
+  while (falta > 0) {
+    const livres = LETRAS.filter(l => n[l] < disp[l]);
+    if (!livres.length) return null;
+    const l = livres.sort((a, b) => (ideal(b) - n[b]) - (ideal(a) - n[a]))[0];
+    n[l]++; falta--;
+  }
+  return falta === 0 ? n : null;
+}
+
+// Maior total dentro da folga. Sem nenhum, a combinação mais próxima do alvo.
+function planejar(folga) {
+  const grupos = palavrasPorPerfil();
+  const disp = Object.fromEntries(LETRAS.map(l => [l, grupos[l].length]));
+  const maximo = LETRAS.reduce((s, l) => s + disp[l], 0);
+  let proximo = null;
+  for (let N = maximo; N >= 1; N--) {
+    const n = distribuir(N, disp);
+    if (!n) continue;
+    const erro = Math.max(...LETRAS.map(l => Math.abs(n[l] / N * 100 - estado.alvos[l])));
+    if (erro <= folga + 1e-9) return {n, N, erro, dentro: true, grupos};
+    if (!proximo || erro < proximo.erro - 1e-9) proximo = {n, N, erro, dentro: false, grupos};
+  }
+  return proximo;
+}
+
+function preencher(parte) {
+  const folga = +$('folga').value;
+  const plano = planejar(folga);
+  if (!plano) return;
+  estado.desfazer = {parte, lista: [...estado[parte]]};
+  estado[parte] = new Set(LETRAS.flatMap(l => plano.grupos[l].slice(0, plano.n[l]).map(p => p.i)));
+  gravar('profiler.' + parte, [...estado[parte]]);
+  estado.modo = parte;
+  montarCartao(); pintarTags(); atualizar(); efeitoVazio();
+  $('desfazer').hidden = false;
+
+  const rotulo = parte === 'sou' ? 'Sou' : 'Devo ser';
+  const contas = LETRAS.map(l => `${l} ${plano.n[l]}`).join(', ');
+  const obtidos = LETRAS.map(l => `${l} ${fmt(plano.n[l] / plano.N * 100)} %`).join(', ');
+  let texto = `Marquei ${plano.N} ${plano.N === 1 ? 'palavra' : 'palavras'} em ${rotulo} (${contas}). Resultado: ${obtidos}.`;
+  if (!plano.dentro) {
+    texto += ` Nenhuma combinação coube na folga escolhida. Esta é a mais próxima, com diferença de até ${pontos(plano.erro)}.`;
+  } else {
+    const melhor = [0.5, 1, 2].filter(f => f > folga).map(f => [f, planejar(f)]).find(([, p]) => p.dentro && p.N > plano.N);
+    if (melhor) texto += ` Com folga de até ${pontos(melhor[0])}, daria para marcar ${melhor[1].N} palavras.`;
+  }
+  $('relato').textContent = texto;
+}
+
+function montarCampos() {
+  $('campos').innerHTML = LETRAS.map(l => `<label ${cor(l)}><span><i></i>${FATORES[l].nome}</span>
+    <input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-alvo="${l}" value="${estado.alvos[l]}" aria-label="Percentual de ${FATORES[l].nome}"></label>`).join('');
+}
+
+function atualizarAlvos() {
+  const soma = somaAlvos(), certo = alvosValidos();
+  $('soma').className = certo ? 'soma' : 'soma erro';
+  $('soma').textContent = certo
+    ? `Soma: ${fmt(soma)} %`
+    : `Soma: ${fmt(soma)} %. Ajuste os valores para fechar 100 % e liberar o preenchimento.`;
+  $('encherSou').disabled = $('encherDevo').disabled = !certo;
+  const r = {total: 1, pct: estado.alvos};
+  $('codigoAlvo').textContent = `Alvo: ${codigoDe(r)}`;
+}
+
+const $ = id => document.getElementById(id);
+const cor = l => `style="--cor:var(--${l})"`;
+
+function montarCartao() {
+  let html = '';
+  for (let b = 0; b < PALAVRAS.length; b += 15) {
+    html += '<div class="bloco"><div class="cab"><span>Nº</span><span>Adjetivo</span><span>Sou</span><span>Devo ser</span></div>';
+    for (const p of PALAVRAS.slice(b, b + 15)) {
+      html += `<div class="linha" data-i="${p.i}">
+        <span class="num">${p.i + 1}</span>
+        <span class="pal"><b>${p.nome}</b><span class="tag" data-tag="${p.i}"></span></span>
+        <label class="oval" data-parte="sou"><input type="checkbox" data-parte="sou" data-i="${p.i}" aria-label="${p.nome}: sou"${estado.sou.has(p.i) ? ' checked' : ''}><span></span></label>
+        <label class="oval" data-parte="devo"><input type="checkbox" data-parte="devo" data-i="${p.i}" aria-label="${p.nome}: devo ser"${estado.devo.has(p.i) ? ' checked' : ''}><span></span></label>
+      </div>`;
+    }
+    html += '</div>';
+  }
+  $('blocos').innerHTML = html;
+}
+
+function pintarTags() {
+  document.querySelectorAll('[data-tag]').forEach(el => {
+    const p = PALAVRAS[+el.dataset.tag], f = fatorDe(p);
+    if (f === 'N') { el.innerHTML = '<span title="Não pontua">–</span>'; return; }
+    const duvida = !estado.trocas[p.i] && p.conf === 'b' ? '?' : '';
+    el.innerHTML = `<i ${cor(f)}></i>${f}${duvida}`;
+    el.title = FATORES[f].nome + (duvida ? ', confiança baixa' : '');
+  });
+}
+
+function montarFatores() {
+  $('fatores').innerHTML = LETRAS.map(l => `
+    <div class="fator" ${cor(l)}>
+      <span class="nome"><i></i>${FATORES[l].nome}</span>
+      <span class="valor" id="v${l}"></span>
+      <div class="trilho"><div class="base"></div><div class="barra" id="b${l}"></div><div class="faixa" id="f${l}"></div><div class="alvo" id="a${l}"></div></div>
+      <span class="dif" id="d${l}"></span>
+    </div>`).join('');
+}
+
+function atualizar() {
+  const r = calcular(marcas(estado.modo));
+  $('codigo').textContent = codigoDe(r);
+  $('total').textContent = r.total === 1 ? '1 palavra' : `${r.total} palavras`;
+  atualizarAlvos();
+  const teto = Math.max(60, ...LETRAS.map(l => Math.max(r.max[l], estado.alvos[l])));
+  const x = v => `${v / teto * 100}%`;
+  for (const l of LETRAS) {
+    const alvo = estado.alvos[l];
+    $('v' + l).textContent = r.total ? `${fmt(r.pct[l])} %` : '–';
+    $('b' + l).style.width = x(r.pct[l]);
+    $('a' + l).style.left = `calc(${x(alvo)} - 1.5px)`;
+    const f = $('f' + l);
+    f.hidden = !r.total || r.max[l] === r.min[l];
+    f.style.left = x(r.min[l]);
+    f.style.width = `${(r.max[l] - r.min[l]) / teto * 100}%`;
+    const d = r.pct[l] - alvo;
+    $('d' + l).textContent = r.total
+      ? `${r.n[l]} de ${r.total}. ${Math.abs(d) < 0.005 ? 'Igual ao alvo' : `${sinal(d)} em relação ao alvo (${fmt(alvo)} %)`}`
+      : `Alvo: ${fmt(alvo)} %`;
+  }
+  document.querySelectorAll('[data-modo]').forEach(b => b.setAttribute('aria-pressed', b.dataset.modo === estado.modo));
+}
+
+function efeitoVazio() {
+  $('efeito').innerHTML = '<p>Passe o mouse em uma palavra, ou toque nela, para ver quanto cada perfil muda.</p>';
+}
+
+function mostrarEfeito(i, parte) {
+  const modo = estado.modo === 'soma' ? 'soma' : parte;
+  const sou = new Set(estado.sou), devo = new Set(estado.devo), alvo = parte === 'sou' ? sou : devo;
+  const marcada = alvo.has(i);
+  if (marcada) alvo.delete(i); else alvo.add(i);
+  const antes = calcular(marcas(modo));
+  const depois = calcular(marcas(modo, sou, devo));
+  const nome = PALAVRAS[i].nome;
+  const rotulo = parte === 'sou' ? 'Sou' : 'Devo ser';
+  if (fatorDe(PALAVRAS[i]) === 'N') {
+    $('efeito').innerHTML = `<p>${nome} não pontua na sua chave.</p>`;
+    return;
+  }
+  $('efeito').innerHTML = `<p>${marcada ? 'Desmarcar' : 'Marcar'} ${nome} em ${rotulo}:</p><div>` +
+    LETRAS.map(l => `<span>${l} ${sinal(depois.pct[l] - antes.pct[l]) || '0,00'}</span>`).join('') + '</div>';
+}
+
+function montarChave() {
+  const opcoes = sel => [...LETRAS.map(l => `<option value="${l}"${sel === l ? ' selected' : ''}>${FATORES[l].nome}</option>`),
+    `<option value="N"${sel === 'N' ? ' selected' : ''}>Não pontua</option>`].join('');
+  const grupos = [...LETRAS, 'N'].map(l => {
+    const lista = PALAVRAS.filter(p => fatorDe(p) === l);
+    if (!lista.length) return '';
+    const titulo = l === 'N' ? 'Não pontua' : FATORES[l].nome;
+    const ponto = l === 'N' ? '' : `<i ${cor(l)}></i>`;
+    return `<div class="grupo"><h2>${ponto}${titulo} <small>${lista.length} palavras</small></h2><div class="rola"><table>
+      <thead><tr><th>Palavra</th><th>Perfil</th><th>Confiança</th><th>Alternativa</th><th>Origem</th></tr></thead><tbody>` +
+      lista.map(p => {
+        const trocada = !!estado.trocas[p.i];
+        return `<tr><td class="${trocada ? 'mudou' : ''}">${p.nome}</td>
+          <td><select data-troca="${p.i}" aria-label="Perfil de ${p.nome}">${opcoes(fatorDe(p))}</select></td>
+          <td>${trocada ? 'Sua escolha' : CONFIANCA[p.conf]}</td>
+          <td>${!trocada && p.alt ? FATORES[p.alt].nome : '–'}</td>
+          <td>${p.citada ? 'Citada pela Sólides' : 'Inferência'}</td></tr>`;
+      }).join('') + '</tbody></table></div></div>';
+  });
+  $('tabelas').innerHTML = grupos.join('');
+}
+
+$('blocos').addEventListener('change', e => {
+  const c = e.target;
+  if (!c.dataset.parte) return;
+  const i = +c.dataset.i, parte = c.dataset.parte;
+  if (c.checked) estado[parte].add(i); else estado[parte].delete(i);
+  gravar('profiler.' + parte, [...estado[parte]]);
+  if (estado.modo !== 'soma') estado.modo = parte;
+  atualizar();
+  mostrarEfeito(i, parte);
+});
+
+function aoApontar(e) {
+  const linha = e.target.closest('.linha');
+  if (!linha) return;
+  const oval = e.target.closest('[data-parte]');
+  const parte = oval ? oval.dataset.parte : (estado.modo === 'devo' ? 'devo' : 'sou');
+  mostrarEfeito(+linha.dataset.i, parte);
+}
+$('blocos').addEventListener('mouseover', aoApontar);
+$('blocos').addEventListener('focusin', aoApontar);
+
+document.querySelectorAll('[data-modo]').forEach(b => b.addEventListener('click', () => {
+  estado.modo = b.dataset.modo;
+  atualizar();
+  efeitoVazio();
+}));
+
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+  const aba = b.dataset.aba;
+  document.body.dataset.aba = aba;
+  document.querySelectorAll('nav button').forEach(o => o.setAttribute('aria-selected', o === b));
+  ['cartao', 'chave', 'teoria'].forEach(id => { $(id).hidden = id !== aba; });
+  window.scrollTo(0, 0);
+}));
+
+$('cega').addEventListener('change', e => $('blocos').classList.toggle('cega', e.target.checked));
+
+$('campos').addEventListener('input', e => {
+  const l = e.target.dataset.alvo;
+  if (!l) return;
+  estado.alvos[l] = Math.max(0, parseFloat(e.target.value) || 0);
+  gravar('profiler.alvos', estado.alvos);
+  $('relato').textContent = '';
+  atualizar();
+});
+
+$('encherSou').addEventListener('click', () => preencher('sou'));
+$('encherDevo').addEventListener('click', () => preencher('devo'));
+
+$('desfazer').addEventListener('click', () => {
+  const {parte, lista} = estado.desfazer;
+  estado[parte] = new Set(lista);
+  gravar('profiler.' + parte, lista);
+  estado.desfazer = null;
+  $('desfazer').hidden = true;
+  $('relato').textContent = 'Preenchimento desfeito. As marcas anteriores voltaram.';
+  montarCartao(); pintarTags(); atualizar(); efeitoVazio();
+});
+
+$('voltarCargo').addEventListener('click', () => {
+  estado.alvos = {...CARGO};
+  gravar('profiler.alvos', estado.alvos);
+  $('relato').textContent = '';
+  montarCampos(); atualizar();
+});
+
+$('limpar').addEventListener('click', () => {
+  if (!confirm('Apagar todas as marcas de Sou e Devo ser?')) return;
+  estado.sou.clear(); estado.devo.clear();
+  estado.desfazer = null;
+  $('desfazer').hidden = true;
+  $('relato').textContent = '';
+  gravar('profiler.sou', []); gravar('profiler.devo', []);
+  montarCartao(); pintarTags(); atualizar(); efeitoVazio();
+});
+
+$('tabelas').addEventListener('change', e => {
+  const i = e.target.dataset.troca;
+  if (i === undefined) return;
+  if (e.target.value === PALAVRAS[+i].fator) delete estado.trocas[i];
+  else estado.trocas[i] = e.target.value;
+  gravar('profiler.trocas', estado.trocas);
+  pintarTags(); montarChave(); atualizar();
+});
+
+$('restaurar').addEventListener('click', () => {
+  estado.trocas = {};
+  gravar('profiler.trocas', {});
+  pintarTags(); montarChave(); atualizar();
+});
+
+montarCampos(); montarCartao(); pintarTags(); montarFatores(); montarChave(); atualizar(); efeitoVazio();
+</script>
+</body>
+</html>
