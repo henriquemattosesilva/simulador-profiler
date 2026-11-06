@@ -65,7 +65,7 @@ body[data-aba=teoria] .painel{display:none}
 .cega .tag{display:none}
 .oval{display:flex;justify-content:center;align-items:center;height:34px;cursor:pointer}
 .oval input{position:absolute;opacity:0;width:1px;height:1px}
-.oval span{display:block;width:26px;height:15px;border:1.5px solid var(--guia);border-radius:50%;transition:background-color .12s}
+.oval span{display:block;width:18px;height:18px;border:1.5px solid var(--guia);border-radius:50%;transition:background-color .12s}
 .oval:hover span{background:var(--linha)}
 .oval input:checked+span{background:var(--grafite);border-color:var(--grafite)}
 .oval input:focus-visible+span{outline:2px solid var(--guia);outline-offset:2px}
@@ -205,6 +205,7 @@ td select{background:var(--folha);border:1px solid var(--linha-forte);border-rad
       </div>
       <div class="acoes">
         <label><input type="checkbox" id="cega"> Esconder o perfil de cada palavra</label>
+        <button class="botao forte" id="baixar" title="Marque ao menos uma palavra para baixar o resultado">Baixar resultado</button>
         <button class="botao" id="limpar">Limpar cartão</button>
       </div>
       <div class="blocos" id="blocos"></div>
@@ -520,6 +521,7 @@ function atualizar() {
       : `Alvo: ${fmt(alvo)} %`;
   }
   document.querySelectorAll('[data-modo]').forEach(b => b.setAttribute('aria-pressed', b.dataset.modo === estado.modo));
+  $('baixar').disabled = !estado.sou.size && !estado.devo.size;
 }
 
 function efeitoVazio() {
@@ -541,6 +543,199 @@ function mostrarEfeito(i, parte) {
   }
   $('efeito').innerHTML = `<p>${marcada ? 'Desmarcar' : 'Marcar'} ${nome} em ${rotulo}:</p><div>` +
     LETRAS.map(l => `<span>${l} ${sinal(depois.pct[l] - antes.pct[l]) || '0,00'}</span>`).join('') + '</div>';
+}
+
+// A imagem usa sempre o tema claro, para ler e imprimir igual em qualquer aparelho.
+const IMG = {
+  largura: 900, margem: 36, escala: 2, fonte: '"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif',
+  fundo: '#FAFCFA', tinta: '#22302B', apagado: '#52625C', guia: '#1C6B55', linha: '#B5CFC2', base: '#DDEBE3',
+  E: '#D1490C', C: '#7A52D6', P: '#0A8F5F', A: '#2470C8',
+};
+
+// Desenha o relatório e devolve a altura usada. A primeira chamada serve só para medir.
+function desenharResultado(ctx, data) {
+  const {largura, margem} = IMG, direita = largura - margem;
+  const util = direita - margem;
+  let y = margem;
+
+  const texto = (t, x, base, peso = 400, tam = 16, cor = IMG.tinta, alinha = 'left') => {
+    ctx.font = `${peso} ${tam}px ${IMG.fonte}`;
+    ctx.fillStyle = cor;
+    ctx.textAlign = alinha;
+    ctx.fillText(t, x, base);
+  };
+  const paragrafo = (t, tam = 15, cor = IMG.apagado, altura = 20) => {
+    ctx.font = `400 ${tam}px ${IMG.fonte}`;
+    let atual = '';
+    for (const palavra of t.split(' ')) {
+      const prova = atual ? `${atual} ${palavra}` : palavra;
+      if (ctx.measureText(prova).width > util && atual) {
+        texto(atual, margem, y + tam, 400, tam, cor);
+        y += altura;
+        atual = palavra;
+      } else atual = prova;
+    }
+    texto(atual, margem, y + tam, 400, tam, cor);
+    y += altura;
+  };
+  const ponto = (x, cy, l) => {
+    ctx.fillStyle = IMG[l];
+    ctx.beginPath();
+    ctx.arc(x, cy, 5, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  const fio = () => {
+    ctx.fillStyle = IMG.linha;
+    ctx.fillRect(margem, y, util, 1);
+  };
+
+  texto('Resultado do Simulador Profiler', margem, y + 28, 700, 30, IMG.guia);
+  texto(data, direita, y + 28, 400, 15, IMG.apagado, 'right');
+  y += 44;
+  paragrafo('Projeto independente, sem vínculo com a Sólides. Não é o teste oficial e não gera resultado válido: os pesos são estimados, porque a chave oficial não é pública.');
+  y += 6;
+
+  const partes = [
+    ['Sou', 'sou', estado.sou.size], ['Devo ser', 'devo', estado.devo.size],
+    ['Soma das duas partes', 'soma', estado.sou.size && estado.devo.size],
+  ].filter(p => p[2]).map(([rotulo, modo]) => ({rotulo, modo, r: calcular(marcas(modo))}));
+  const teto = Math.max(60, ...LETRAS.map(l => estado.alvos[l]), ...partes.flatMap(p => LETRAS.map(l => p.r.max[l])));
+  const codigoAlvo = codigoDe({total: 1, pct: estado.alvos});
+
+  // Colunas das barras.
+  const iniBarra = margem + 118, largBarra = 350;
+  const colunas = [['Palavras', direita - 276], ['Resultado', direita - 180], ['Alvo', direita - 90], ['Diferença', direita]];
+
+  for (const {rotulo, modo, r} of partes) {
+    y += 16;
+    texto(`${rotulo}: ${codigoDe(r)}`, margem, y + 22, 700, 24);
+    const unidade = modo === 'soma' ? 'marcas' : (r.total === 1 ? 'palavra' : 'palavras');
+    texto(`${r.total} ${unidade}. Alvo: ${codigoAlvo}`, direita, y + 22, 400, 15, IMG.apagado, 'right');
+    y += 36;
+    for (const [nome, x] of colunas) texto(nome, x, y + 12, 600, 14, IMG.apagado, 'right');
+    y += 20;
+    for (const l of LETRAS) {
+      fio();
+      const alvo = estado.alvos[l], meio = y + 19, topoBarra = meio - 7;
+      ponto(margem + 5, meio, l);
+      texto(FATORES[l].nome, margem + 16, meio + 6, 600, 16);
+      const x = v => iniBarra + v / teto * largBarra;
+      ctx.fillStyle = IMG.base;
+      ctx.fillRect(iniBarra, topoBarra, largBarra, 10);
+      if (r.pct[l] > 0) {
+        ctx.fillStyle = IMG[l];
+        ctx.beginPath();
+        ctx.roundRect(iniBarra, topoBarra, x(r.pct[l]) - iniBarra, 10, [0, 4, 4, 0]);
+        ctx.fill();
+      }
+      if (r.total && r.max[l] !== r.min[l]) {
+        ctx.fillStyle = IMG.tinta;
+        ctx.fillRect(x(r.min[l]), topoBarra + 14, x(r.max[l]) - x(r.min[l]), 2);
+        ctx.fillRect(x(r.min[l]), topoBarra + 12, 1.5, 6);
+        ctx.fillRect(x(r.max[l]) - 1.5, topoBarra + 12, 1.5, 6);
+      }
+      ctx.fillStyle = IMG.fundo;
+      ctx.fillRect(x(alvo) - 3, topoBarra - 4, 6, 18);
+      ctx.fillStyle = IMG.tinta;
+      ctx.fillRect(x(alvo) - 1.5, topoBarra - 3, 3, 16);
+      const valores = [
+        r.total ? `${r.n[l]} de ${r.total}` : '–',
+        r.total ? `${fmt(r.pct[l])} %` : '–',
+        `${fmt(alvo)} %`,
+        r.total ? sinal(r.pct[l] - alvo) : '–',
+      ];
+      valores.forEach((v, i) => texto(v, colunas[i][1], meio + 6, i === 1 ? 700 : 400, 16, IMG.tinta, 'right'));
+      y += 38;
+    }
+    fio();
+    y += 6;
+  }
+  y += 4;
+  paragrafo('Marca vertical: percentual do alvo. Linha fina: faixa possível se as palavras incertas forem do perfil alternativo.', 14, IMG.apagado, 18);
+
+  y += 22;
+  texto('Palavras marcadas', margem, y + 22, 700, 24, IMG.guia);
+  y += 32;
+  const contagem = parte => {
+    const q = estado[parte].size;
+    return q ? `${q} ${q === 1 ? 'palavra' : 'palavras'}` : 'nenhuma palavra';
+  };
+  paragrafo(`Sou: ${contagem('sou')}. Devo ser: ${contagem('devo')}. O círculo preenchido indica em qual parte a palavra foi marcada.`);
+  y += 8;
+
+  const marcadas = PALAVRAS.filter(p => estado.sou.has(p.i) || estado.devo.has(p.i));
+  const circulo = (cx, cy, cheio) => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6.5, 0, Math.PI * 2);
+    if (cheio) {
+      ctx.fillStyle = IMG.tinta;
+      ctx.fill();
+    }
+    ctx.strokeStyle = cheio ? IMG.tinta : IMG.guia;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  };
+  const espaco = 16, largColuna = (util - espaco * 3) / 4, alturaLinha = 23;
+  let maiorColuna = 0;
+  LETRAS.forEach((l, c) => {
+    const x = margem + c * (largColuna + espaco);
+    const xSou = x + largColuna - 58, xDevo = x + largColuna - 22;
+    const lista = marcadas.filter(p => fatorDe(p) === l);
+    ponto(x + 5, y + 11, l);
+    texto(FATORES[l].nome, x + 16, y + 16, 600, 16);
+    texto('Sou', xSou, y + 16, 600, 13, IMG.apagado, 'center');
+    texto('Devo ser', xDevo, y + 16, 600, 13, IMG.apagado, 'center');
+    lista.forEach((p, n) => {
+      const topo = y + 26 + n * alturaLinha;
+      ctx.fillStyle = IMG.linha;
+      ctx.fillRect(x, topo, largColuna, 1);
+      texto(p.nome, x, topo + 17, 400, 15);
+      circulo(xSou, topo + 12, estado.sou.has(p.i));
+      circulo(xDevo, topo + 12, estado.devo.has(p.i));
+    });
+    maiorColuna = Math.max(maiorColuna, lista.length);
+  });
+  y += 26 + maiorColuna * alturaLinha + 12;
+
+  const onde = p => (estado.sou.has(p.i) && estado.devo.has(p.i) ? 'Sou e Devo ser' : estado.sou.has(p.i) ? 'Sou' : 'Devo ser');
+  const fora = marcadas.filter(p => fatorDe(p) === 'N').map(p => `${p.nome} (${onde(p)})`);
+  if (fora.length) paragrafo(`Não pontua: ${fora.join(', ')}.`);
+
+  const trocas = Object.keys(estado.trocas).length;
+  if (trocas) paragrafo(`A chave de pesos foi alterada em ${trocas} ${trocas === 1 ? 'palavra' : 'palavras'} neste navegador.`);
+  paragrafo('Estimativa para estudo. O resultado oficial pode ser diferente.');
+  return y + margem - 20;
+}
+
+async function baixarResultado() {
+  try {
+    await Promise.all([400, 600, 700].map(p => document.fonts.load(`${p} 16px "Barlow Semi Condensed"`)));
+  } catch { /* sem a fonte, a imagem usa a alternativa */ }
+  const agora = new Date();
+  const data = agora.toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short'});
+  try {
+    const tela = document.createElement('canvas');
+    const ctx = tela.getContext('2d');
+    const altura = desenharResultado(ctx, data);
+    tela.width = IMG.largura * IMG.escala;
+    tela.height = Math.ceil(altura * IMG.escala);
+    ctx.scale(IMG.escala, IMG.escala);
+    ctx.fillStyle = IMG.fundo;
+    ctx.fillRect(0, 0, IMG.largura, altura);
+    desenharResultado(ctx, data);
+    const arquivo = await new Promise(ok => tela.toBlob(ok, 'image/png'));
+    if (!arquivo) throw new Error('imagem vazia');
+    const url = URL.createObjectURL(arquivo);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `resultado-profiler-${agora.toLocaleDateString('sv-SE')}.png`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch {
+    $('relato').textContent = 'O navegador não conseguiu gerar a imagem. Atualize a página e tente de novo, ou use outro navegador.';
+  }
 }
 
 function montarChave() {
@@ -630,6 +825,8 @@ $('voltarCargo').addEventListener('click', () => {
   $('relato').textContent = '';
   montarCampos(); atualizar();
 });
+
+$('baixar').addEventListener('click', baixarResultado);
 
 $('limpar').addEventListener('click', () => {
   if (!confirm('Apagar todas as marcas de Sou e Devo ser?')) return;
